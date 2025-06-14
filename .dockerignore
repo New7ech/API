@@ -1,0 +1,16 @@
+# Node / JS
+node_modules/
+**/node_modules/
+npm-debug.log
+yarn-error.log
+
+# PHP / Laravel
+vendor/
+.env
+.phpunit.result.cache
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+*.log

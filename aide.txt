@@ -1,0 +1,11 @@
+php artisan make:controller AccueilController --model=Accueil --resource --requests
+
+php artisan make:migration create_clients_table
+
+php artisan make:notification StockLowNotification
+
+installer spatie
+installer domPDF
+
+composer require nesbot/carbon
+

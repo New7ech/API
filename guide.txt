@@ -1,0 +1,20 @@
+la struture de la table users
+Champ	Type	Rôle / Description
+photo	VARCHAR(255)	Image de profil, avatar utilisateur
+phone	VARCHAR(20)	Numéro de téléphone de l’utilisateur
+address	TEXT	Adresse complète de l’utilisateur
+birthdate	DATE	Date de naissance de l’utilisateur
+locale	VARCHAR(10)	Langue préférée ou locale de l’utilisateur
+currency	VARCHAR(10)	Devise par défaut pour cet utilisateur
+role_id	BIGINT UNSIGNED	Identifiant du rôle, permettant de gérer les permissions (ACL)
+status	TINYINT(1)	Statut actif/inactif (1 = actif, 0 = inactif)
+created_by	BIGINT UNSIGNED	ID de l’utilisateur qui a créé ce compte (audit)
+updated_by	BIGINT UNSIGNED	ID de l’utilisateur qui a modifié ce compte (audit)
+last_login_at	TIMESTAMP	Date/heure de la dernière connexion
+last_action	TIMESTAMP	Dernière action effectuée par l’utilisateur
+two_factor_secret	VARCHAR(255)	Clé secrète pour la 2FA (authentification à deux facteurs)
+two_factor_enabled	TINYINT(1)	Indique si la 2FA est activée pour cet utilisateur
+preferences	JSON	Stockage des préférences utilisateur (ex : notifications, UI)
+is_admin	TINYINT(1)	Droit administrateur explicite (si besoin de distinguer admin)
+module_access	JSON	Contrôle d’accès par module, pour gérer l’accès aux différentes sections
+notifications_enabled	TINYINT(1)	Activer/désactiver les notifications et alertes	
