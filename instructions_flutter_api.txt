@@ -1,0 +1,789 @@
+# Guide Complet: Intégration d'une API Laravel avec une Application Flutter
+
+Ce document fournit des instructions détaillées pour configurer une API Laravel (avec Laravel Sanctum pour l'authentification) et l'intégrer avec une application Flutter.
+
+## 1. Configuration du Backend (API Laravel)
+
+Cette section vous guidera à travers la configuration de votre environnement backend Laravel.
+
+### 1.1. Cloner le Référentiel
+Si vous n'avez pas encore le projet, clonez-le depuis votre dépôt Git :
+```bash
+git clone <URL_DE_VOTRE_REPOSITORY>
+cd <NOM_DU_DOSSIER_DU_PROJET>
+```
+
+### 1.2. Installer les Dépendances PHP
+Utilisez Composer pour installer les dépendances PHP nécessaires définies dans votre fichier `composer.json`. Si vous n'avez pas Composer d'installé globalement, vous pouvez télécharger `composer.phar` dans le répertoire de votre projet.
+
+```bash
+# Si Composer est installé globalement
+composer install
+
+# Sinon, téléchargez et utilisez composer.phar
+# php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
+# php composer-setup.php --install-dir=/usr/local/bin --filename=composer # Ou un autre répertoire dans votre PATH
+# php -r "unlink('composer-setup.php');"
+# Assurez-vous que le binaire composer est exécutable et dans votre PATH, ou utilisez :
+# php composer.phar install
+```
+*Note : Dans l'environnement de développement de ce projet, `php /app/composer.phar install` a été utilisé.*
+
+### 1.3. Configuration de l'Environnement (`.env`)
+Copiez le fichier d'exemple `.env.example` vers `.env` :
+```bash
+cp .env.example .env
+```
+Ouvrez le fichier `.env` et configurez les variables d'environnement, notamment pour la base de données.
+
+**Configuration de la Base de Données (SQLite - Recommandé pour le développement local) :**
+Pour utiliser SQLite, modifiez les lignes suivantes dans votre fichier `.env` :
+```dotenv
+DB_CONNECTION=sqlite
+# Supprimez ou commentez les autres lignes DB_HOST, DB_PORT, DB_DATABASE, DB_USERNAME, DB_PASSWORD
+# DB_HOST=127.0.0.1
+# DB_PORT=3306
+# DB_DATABASE=laravel
+# DB_USERNAME=root
+# DB_PASSWORD=
+```
+Créez ensuite le fichier de base de données SQLite :
+```bash
+touch database/database.sqlite
+```
+Assurez-vous que le chemin vers `database.sqlite` est correct par rapport à la racine de votre projet. Laravel le créera automatiquement si `DB_CONNECTION` est `sqlite` et que le fichier `database/database.sqlite` existe (même vide) lors de la première migration.
+
+**Générer la Clé d'Application :**
+```bash
+php artisan key:generate
+```
+
+### 1.4. Exécuter les Migrations de la Base de Données
+Pour créer les tables de la base de données, y compris celles pour Sanctum (`personal_access_tokens`) et les autres modèles (articles, etc.) :
+```bash
+php artisan migrate --force
+```
+*Note : L'option `--force` est utilisée ici car l'environnement de développement initial était configuré comme "production", ce qui nécessite une confirmation pour les migrations.*
+
+### 1.5. Démarrer le Serveur de Développement Laravel
+Pour lancer votre API Laravel (par défaut sur `http://127.0.0.1:8000`) :
+```bash
+php artisan serve
+```
+Vous pouvez spécifier un port différent si nécessaire :
+```bash
+php artisan serve --port=8001
+```
+
+## 2. Authentification à l'API (Laravel Sanctum)
+
+Laravel Sanctum est utilisé pour l'authentification basée sur les tokens.
+
+### 2.1. Obtenir un Token d'Authentification
+Pour obtenir un token, l'utilisateur doit envoyer ses identifiants (email, mot de passe) et un nom d'appareil (`device_name`) à l'endpoint `/api/login`.
+
+**Exemple avec cURL :**
+```bash
+curl -X POST http://127.0.0.1:8000/api/login \
+     -H "Content-Type: application/json" \
+     -H "Accept: application/json" \
+     -d '{
+           "email": "utilisateur@example.com",
+           "password": "password123",
+           "device_name": "MonAppMobile"
+         }'
+```
+**Réponse attendue ( succès) :**
+```json
+{
+    "token": "PLAIN_TEXT_TOKEN_ICI"
+}
+```
+Ce `PLAIN_TEXT_TOKEN_ICI` doit être stocké de manière sécurisée par l'application Flutter et envoyé avec chaque requête nécessitant une authentification.
+
+**Réponse attendue (échec) :**
+```json
+{
+    "message": "Les informations d'identification fournies sont incorrectes.",
+    "errors": {
+        "email": [
+            "Les informations d'identification fournies sont incorrectes."
+        ]
+    }
+}
+```
+
+### 2.2. Utiliser le Token pour les Requêtes Authentifiées
+Pour accéder aux routes protégées, incluez le token dans l'en-tête `Authorization` de vos requêtes HTTP :
+```bash
+curl -X GET http://127.0.0.1:8000/api/user \
+     -H "Accept: application/json" \
+     -H "Authorization: Bearer VOTRE_PLAIN_TEXT_TOKEN_ICI"
+```
+**Réponse attendue (informations utilisateur) :**
+```json
+{
+    "id": 1,
+    "name": "Nom Utilisateur",
+    "email": "utilisateur@example.com",
+    // ... autres champs utilisateur
+}
+```
+
+## 3. Endpoints de l'API (Exemple avec les Articles)
+
+Voici les opérations CRUD pour la ressource `Article`.
+**URL de base de l'API :** `http://127.0.0.1:8000/api` (ajustez si vous utilisez un port différent ou un hôte virtuel).
+
+Toutes les requêtes suivantes doivent inclure l'en-tête `Authorization: Bearer VOTRE_TOKEN` et `Accept: application/json`.
+
+### 3.1. Lister les Articles (GET)
+- **Endpoint :** `/articles`
+- **Méthode :** `GET`
+- **Exemple cURL :**
+  ```bash
+  curl -X GET http://127.0.0.1:8000/api/articles \
+       -H "Authorization: Bearer VOTRE_TOKEN" \
+       -H "Accept: application/json"
+  ```
+- **Réponse (JSON) :**
+  ```json
+  {
+      "current_page": 1,
+      "data": [
+          {
+              "id": 1,
+              "name": "Nom de l'Article 1",
+              "description": "Description de l'article 1",
+              "created_at": "YYYY-MM-DDTHH:MM:SS.mmmmmmZ",
+              "updated_at": "YYYY-MM-DDTHH:MM:SS.mmmmmmZ",
+              "created_by": 1
+          }
+          // ... autres articles
+      ],
+      // ... informations de pagination
+  }
+  ```
+
+### 3.2. Créer un Article (POST)
+- **Endpoint :** `/articles`
+- **Méthode :** `POST`
+- **Corps de la requête (JSON) :**
+  ```json
+  {
+      "name": "Nouvel Article",
+      "description": "Description du nouvel article",
+      "price": 19.99, // Exemple, si vous avez un champ prix
+      "quantity": 100 // Exemple, si vous avez un champ quantité
+      // Assurez-vous que les champs correspondent à votre modèle Article et StoreArticleRequest
+  }
+  ```
+- **Exemple cURL :**
+  ```bash
+  curl -X POST http://127.0.0.1:8000/api/articles \
+       -H "Authorization: Bearer VOTRE_TOKEN" \
+       -H "Content-Type: application/json" \
+       -H "Accept: application/json" \
+       -d '{ "name": "Nouvel Article", "description": "Description...", "price": 20.5, "quantity": 50 }'
+       // Adaptez les champs à votre modèle Article et StoreArticleRequest
+  ```
+- **Réponse (JSON, code 201) :**
+  ```json
+  {
+      "id": 2,
+      "name": "Nouvel Article",
+      "description": "Description...",
+      "created_by": 1, // L'ID de l'utilisateur authentifié
+      // ... autres champs
+      "created_at": "...",
+      "updated_at": "..."
+  }
+  ```
+
+### 3.3. Afficher un Article Spécifique (GET)
+- **Endpoint :** `/articles/{id}`
+- **Méthode :** `GET`
+- **Exemple cURL :**
+  ```bash
+  curl -X GET http://127.0.0.1:8000/api/articles/1 \
+       -H "Authorization: Bearer VOTRE_TOKEN" \
+       -H "Accept: application/json"
+  ```
+- **Réponse (JSON) :**
+  ```json
+  {
+      "id": 1,
+      "name": "Nom de l'Article 1",
+      // ... autres champs
+  }
+  ```
+
+### 3.4. Mettre à Jour un Article (PUT)
+- **Endpoint :** `/articles/{id}`
+- **Méthode :** `PUT`
+- **Corps de la requête (JSON) :**
+  ```json
+  {
+      "name": "Article Modifié",
+      "description": "Description mise à jour."
+      // ... autres champs à modifier (selon UpdateArticleRequest)
+  }
+  ```
+- **Exemple cURL :**
+  ```bash
+  curl -X PUT http://127.0.0.1:8000/api/articles/1 \
+       -H "Authorization: Bearer VOTRE_TOKEN" \
+       -H "Content-Type: application/json" \
+       -H "Accept: application/json" \
+       -d '{ "name": "Article Modifié", "description": "Description mise à jour." }'
+  ```
+- **Réponse (JSON) :**
+  ```json
+  {
+      "id": 1,
+      "name": "Article Modifié",
+      "description": "Description mise à jour.",
+      // ... autres champs
+  }
+  ```
+
+### 3.5. Supprimer un Article (DELETE)
+- **Endpoint :** `/articles/{id}`
+- **Méthode :** `DELETE`
+- **Exemple cURL :**
+  ```bash
+  curl -X DELETE http://127.0.0.1:8000/api/articles/1 \
+       -H "Authorization: Bearer VOTRE_TOKEN" \
+       -H "Accept: application/json"
+  ```
+- **Réponse (code 204 No Content) :**
+  Aucun contenu dans la réponse si la suppression réussit.
+
+## 4. Intégration avec Flutter
+
+Cette section détaille la configuration d'une application Flutter pour communiquer avec l'API Laravel.
+
+### 4.1. Ajouter les Dépendances Flutter
+Ouvrez votre fichier `pubspec.yaml` et ajoutez les paquets suivants :
+```yaml
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0 # Pour les requêtes HTTP (vérifiez la dernière version)
+  shared_preferences: ^2.2.0 # Pour stocker le token (vérifiez la dernière version)
+  # Ajoutez d'autres dépendances si nécessaire (ex: provider, flutter_bloc pour la gestion d'état)
+```
+Exécutez ensuite `flutter pub get` dans votre terminal.
+
+### 4.2. Permissions Réseau (Développement)
+
+**Pour Android (`android/app/src/main/AndroidManifest.xml`) :**
+Ajoutez la permission INTERNET si elle n'est pas déjà présente. Pour le trafic HTTP en clair (développement uniquement), ajoutez `android:usesCleartextTraffic="true"` dans la balise `<application>` :
+```xml
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <application
+        android:label="votre_app"
+        android:name="${applicationName}"
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true"> <!-- IMPORTANT pour HTTP en développement -->
+        <!-- ... autres configurations ... -->
+    </application>
+</manifest>
+```
+
+**Pour iOS (`ios/Runner/Info.plist`) :**
+Pour autoriser les connexions HTTP arbitraires (développement uniquement), ajoutez :
+```xml
+<key>NSAppTransportSecurity</key>
+<dict>
+    <key>NSAllowsArbitraryLoads</key>
+    <true/>
+</dict>
+```
+**Attention :** Pour la production, utilisez HTTPS et configurez les exceptions de domaine spécifiques si nécessaire, plutôt que d'autoriser toutes les charges arbitraires.
+
+### 4.3. Créer un Service API (`ApiService.dart`)
+Créez un fichier `lib/services/api_service.dart` (ou un nom similaire). Ce service gérera la communication avec votre API.
+
+```dart
+import 'dart:convert';
+import 'dart:io' show Platform;
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+
+class ApiService {
+  // Adapter l'URL de base en fonction de la plateforme
+  // Pour l'émulateur Android, 10.0.2.2 pointe vers le localhost de la machine hôte.
+  // Pour le simulateur iOS ou un appareil physique sur le même réseau, utilisez l'IP de votre machine.
+  // Pour le web, si l'API est sur le même domaine, vous pouvez utiliser une URL relative ou complète.
+  // Si le port de Laravel est 8000 (par défaut)
+  String get _androidBaseUrl => 'http://10.0.2.2:8000/api';
+  String get _iosBaseUrl => 'http://127.0.0.1:8000/api'; // Ou l'IP de votre machine
+  // Pour le test sur appareil réel, remplacez par l'IP de votre machine sur le réseau local
+  // ex: String _deviceBaseUrl = 'http://192.168.1.100:8000/api';
+
+  // Fonction pour obtenir l'URL de base dynamiquement
+  String get baseUrl {
+    if (Platform.isAndroid) {
+      return _androidBaseUrl;
+    } else if (Platform.isIOS) {
+      return _iosBaseUrl;
+    } else {
+      // Pour le web ou autres plateformes, vous pouvez définir une URL par défaut
+      // ou lever une exception si la plateforme n'est pas supportée.
+      return 'http://127.0.0.1:8000/api'; // Fallback ou pour le web
+    }
+  }
+
+  Future<String?> _getToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('auth_token');
+  }
+
+  Future<void> _saveToken(String token) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('auth_token', token);
+  }
+
+  Future<void> _removeToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('auth_token');
+  }
+
+  Future<Map<String, String>> _getHeaders({bool includeAuth = true}) async {
+    final headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+    if (includeAuth) {
+      final token = await _getToken();
+      if (token != null) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+    }
+    return headers;
+  }
+
+  // Méthode de connexion
+  Future<bool> login(String email, String password, String deviceName) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/login'),
+      headers: await _getHeaders(includeAuth: false),
+      body: jsonEncode({
+        'email': email,
+        'password': password,
+        'device_name': deviceName,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['token'] != null) {
+        await _saveToken(data['token']);
+        return true;
+      }
+    }
+    print('Login error: ${response.statusCode} - ${response.body}');
+    return false;
+  }
+
+  Future<void> logout() async {
+    // Optionnel : appeler un endpoint /api/logout sur le serveur pour invalider le token côté serveur
+    // final token = await _getToken();
+    // if (token != null) {
+    //   await http.post(
+    //     Uri.parse('$baseUrl/logout'), // Assurez-vous que cet endpoint existe et fonctionne avec Sanctum
+    //     headers: await _getHeaders(),
+    //   );
+    // }
+    await _removeToken();
+  }
+
+  Future<dynamic> _handleResponse(http.Response response) {
+    final dynamic body = jsonDecode(response.body);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return Future.value(body);
+    } else if (response.statusCode == 401) {
+      // Gérer la déconnexion automatique ou la redirection vers la page de connexion
+      logout(); // Exemple simple
+      return Future.error('Non autorisé: ${response.statusCode} - ${response.body}');
+    } else {
+      return Future.error('Erreur API: ${response.statusCode} - ${response.body}');
+    }
+  }
+
+  // CRUD pour Articles
+  Future<List<dynamic>> getArticles() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/articles'),
+      headers: await _getHeaders(),
+    );
+    // La réponse pour les articles est généralement une liste paginée
+    // Adaptez ceci en fonction de la structure de votre réponse (ex: body['data'] si paginé)
+    final data = await _handleResponse(response);
+    return data['data'] as List<dynamic>; // Si la liste est dans la clé 'data'
+  }
+
+  Future<dynamic> createArticle(Map<String, dynamic> articleData) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/articles'),
+      headers: await _getHeaders(),
+      body: jsonEncode(articleData),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<dynamic> getArticle(int id) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/articles/$id'),
+      headers: await _getHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<dynamic> updateArticle(int id, Map<String, dynamic> articleData) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/articles/$id'),
+      headers: await _getHeaders(),
+      body: jsonEncode(articleData),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<void> deleteArticle(int id) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/articles/$id'),
+      headers: await _getHeaders(),
+    );
+    if (response.statusCode != 204) {
+      // 204 No Content est la réponse attendue pour une suppression réussie
+      throw Exception('Failed to delete article: ${response.statusCode} - ${response.body}');
+    }
+  }
+}
+```
+
+### 4.4. Exemple de Widget Flutter (`ArticleScreen.dart`)
+Voici un exemple simple de widget pour afficher des articles et gérer la connexion/déconnexion.
+Créez un fichier `lib/screens/article_screen.dart`.
+
+```dart
+import 'package:flutter/material.dart';
+import '../services/api_service.dart'; // Assurez-vous que le chemin est correct
+
+// Modèle de données simple pour Article (à placer dans un fichier séparé, ex: models/article.dart)
+class Article {
+  final int id;
+  final String name;
+  final String description;
+
+  Article({required this.id, required this.name, required this.description});
+
+  factory Article.fromJson(Map<String, dynamic> json) {
+    return Article(
+      id: json['id'],
+      name: json['name'] ?? 'Nom non disponible',
+      description: json['description'] ?? 'Description non disponible',
+    );
+  }
+}
+
+
+class ArticleScreen extends StatefulWidget {
+  const ArticleScreen({super.key});
+
+  @override
+  State<ArticleScreen> createState() => _ArticleScreenState();
+}
+
+class _ArticleScreenState extends State<ArticleScreen> {
+  final ApiService _apiService = ApiService();
+  bool _isLoggedIn = false;
+  bool _isLoading = false;
+  String? _errorMessage;
+  List<Article> _articles = [];
+
+  // Contrôleurs pour les champs de texte de connexion
+  final TextEditingController _emailController = TextEditingController(text: 'test@example.com'); // Pré-remplir pour test
+  final TextEditingController _passwordController = TextEditingController(text: 'password'); // Pré-remplir pour test
+  final TextEditingController _deviceNameController = TextEditingController(text: 'FlutterApp');
+
+
+  @override
+  void initState() {
+    super.initState();
+    _checkLoginStatus();
+  }
+
+  Future<void> _checkLoginStatus() async {
+    final token = await SharedPreferences.getInstance().then((prefs) => prefs.getString('auth_token'));
+    setState(() {
+      _isLoggedIn = token != null;
+    });
+    if (_isLoggedIn) {
+      _fetchArticles();
+    }
+  }
+
+  Future<void> _login() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final success = await _apiService.login(
+        _emailController.text,
+        _passwordController.text,
+        _deviceNameController.text,
+      );
+      if (success) {
+        setState(() {
+          _isLoggedIn = true;
+        });
+        _fetchArticles();
+      } else {
+        setState(() {
+          _errorMessage = 'Échec de la connexion. Vérifiez vos identifiants.';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Erreur de connexion: ${e.toString()}';
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _logout() async {
+    setState(() {
+      _isLoading = true;
+    });
+    await _apiService.logout();
+    setState(() {
+      _isLoggedIn = false;
+      _articles = [];
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _fetchArticles() async {
+    if (!_isLoggedIn) return;
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final articlesData = await _apiService.getArticles();
+      // Assurez-vous que articlesData est une List<dynamic> où chaque élément est un Map<String, dynamic>
+      setState(() {
+        _articles = articlesData.map((data) => Article.fromJson(data as Map<String, dynamic>)).toList();
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Erreur de chargement des articles: ${e.toString()}';
+        if (e.toString().contains('Non autorisé')) { // Simple check, à améliorer
+            _logout(); // Déconnecter si non autorisé
+        }
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  // Méthode pour afficher le formulaire de création d'article
+  void _showCreateArticleDialog() {
+    final nameController = TextEditingController();
+    final descriptionController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Créer un nouvel article'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Nom')),
+              TextField(controller: descriptionController, decoration: const InputDecoration(labelText: 'Description')),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Annuler')),
+            ElevatedButton(
+              onPressed: () async {
+                if (nameController.text.isNotEmpty && descriptionController.text.isNotEmpty) {
+                  try {
+                    await _apiService.createArticle({
+                      'name': nameController.text,
+                      'description': descriptionController.text,
+                      // Ajoutez d'autres champs si nécessaire pour votre API
+                    });
+                    Navigator.of(context).pop();
+                    _fetchArticles(); // Rafraîchir la liste
+                  } catch (e) {
+                    // Gérer l'erreur (par exemple, afficher un SnackBar)
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Erreur création: ${e.toString()}'))
+                    );
+                  }
+                }
+              },
+              child: const Text('Créer'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Articles'),
+        actions: [
+          if (_isLoggedIn)
+            IconButton(
+              icon: const Icon(Icons.logout),
+              onPressed: _logout,
+            ),
+        ],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _isLoggedIn
+                ? Column(
+                    children: [
+                      if (_errorMessage != null)
+                        Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
+                      Expanded(
+                        child: _articles.isEmpty
+                            ? const Center(child: Text('Aucun article trouvé.'))
+                            : ListView.builder(
+                                itemCount: _articles.length,
+                                itemBuilder: (context, index) {
+                                  final article = _articles[index];
+                                  return ListTile(
+                                    title: Text(article.name),
+                                    subtitle: Text(article.description),
+                                    trailing: IconButton(
+                                      icon: const Icon(Icons.delete, color: Colors.red),
+                                      onPressed: () async {
+                                        try {
+                                          await _apiService.deleteArticle(article.id);
+                                          _fetchArticles(); // Rafraîchir
+                                        } catch (e) {
+                                           ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(content: Text('Erreur suppression: ${e.toString()}'))
+                                          );
+                                        }
+                                      },
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
+                  )
+                : _buildLoginForm(),
+      ),
+      floatingActionButton: _isLoggedIn
+        ? FloatingActionButton(
+            onPressed: _showCreateArticleDialog,
+            tooltip: 'Créer un article',
+            child: const Icon(Icons.add),
+          )
+        : null,
+    );
+  }
+
+  Widget _buildLoginForm() {
+    return Center(
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text('Veuillez vous connecter', style: TextStyle(fontSize: 18)),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _emailController,
+              decoration: const InputDecoration(labelText: 'Email'),
+              keyboardType: TextInputType.emailAddress,
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _passwordController,
+              decoration: const InputDecoration(labelText: 'Mot de passe'),
+              obscureText: true,
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _deviceNameController,
+              decoration: const InputDecoration(labelText: 'Nom de l\'appareil (Device Name)'),
+            ),
+            const SizedBox(height: 20),
+            if (_errorMessage != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10.0),
+                child: Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
+              ),
+            ElevatedButton(
+              onPressed: _login,
+              child: const Text('Se connecter'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Pour exécuter cet exemple, assurez-vous d'avoir un main.dart qui appelle ArticleScreen
+// Exemple de main.dart:
+/*
+import 'package:flutter/material.dart';
+import 'screens/article_screen.dart'; // Ajustez le chemin si nécessaire
+
+void main() {
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Flutter Laravel API Demo',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+      ),
+      home: const ArticleScreen(),
+    );
+  }
+}
+*/
+```
+
+## 5. Bonnes Pratiques et Notes Supplémentaires
+
+- **HTTPS :** En production, utilisez toujours HTTPS pour votre API afin de sécuriser les données en transit. Configurez un certificat SSL/TLS sur votre serveur.
+- **Stockage Sécurisé du Token :** Pour des applications de production, `shared_preferences` est acceptable pour des tokens non critiques. Pour des données plus sensibles, considérez `flutter_secure_storage`.
+- **Variables d'Environnement Flutter :** Pour gérer différentes configurations (développement, production) comme les URLs d'API, utilisez des fichiers de configuration d'environnement en Flutter (par exemple, avec `flutter_dotenv`).
+- **Modèles de Données Dart :** Créez des classes Dart pour représenter les données de votre API (comme l'exemple `Article` ci-dessus). Utilisez des usines (factories) `fromJson` pour la désérialisation. Des outils comme `json_serializable` peuvent automatiser cela.
+- **Gestion d'État Flutter :** Pour des applications plus complexes, utilisez une solution de gestion d'état plus robuste (Provider, BLoC/Cubit, Riverpod, GetX) pour gérer l'état de l'interface utilisateur, les chargements, les erreurs, et les données.
+- **Tests :** Écrivez des tests unitaires et d'intégration pour votre API Laravel et des tests de widgets/unitaires pour votre application Flutter.
+- **Validation et Gestion des Erreurs :** Implémentez une validation robuste des entrées côté client (Flutter) et côté serveur (Laravel). Fournissez des messages d'erreur clairs à l'utilisateur. Le `ApiService` ci-dessus inclut une gestion basique des erreurs.
+- **Déconnexion côté Serveur :** L'implémentation actuelle de `logout()` dans `ApiService` supprime uniquement le token localement. Pour une sécurité accrue, vous devriez implémenter un endpoint `/api/logout` dans Laravel qui invalide le token côté serveur (Sanctum peut le faire en supprimant le token d'accès personnel).
+
+Ce guide devrait vous fournir une base solide pour commencer. Adaptez et étendez ces exemples en fonction des besoins spécifiques de votre projet.
+```
