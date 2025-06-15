@@ -11,7 +11,7 @@ class UpdateArticleRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return true;
+        return true; // Or based on your authorization logic
     }
 
     /**
@@ -22,13 +22,13 @@ class UpdateArticleRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => 'required|string|max:255',
+            'name' => 'sometimes|required|string|max:255', // 'sometimes' for PATCH, 'required' for PUT
             'description' => 'nullable|string',
-            'prix' => 'required|numeric|min:0',
-            'quantite' => 'required|integer|min:0',
-            'category_id' => 'required|exists:categories,id',
-            'fournisseur_id' => 'required|exists:fournisseurs,id',
-            'emplacement_id' => 'required|exists:emplacements,id',
+            'prix' => 'sometimes|required|numeric|min:0',
+            'quantite' => 'sometimes|required|integer|min:0',
+            'category_id' => 'nullable|exists:categories,id',    // Changed to nullable
+            'fournisseur_id' => 'nullable|exists:fournisseurs,id', // Changed to nullable
+            'emplacement_id' => 'nullable|exists:emplacements,id', // Changed to nullable
         ];
     }
 }
