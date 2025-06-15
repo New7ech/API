@@ -2,110 +2,111 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreArticleRequest;
 use App\Http\Requests\UpdateArticleRequest;
 use App\Models\Article;
-use App\Models\Categorie;
-use App\Models\Emplacement;
-use App\Models\Fournisseur;
-use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\Auth; // Added for auth()->id()
 
 class ArticleController extends Controller
 {
     /**
-     * Affiche une liste des ressources.
-     *
-     * @param  \Illuminate\Http\Request  $request La requête HTTP.
-     * @return \Illuminate\View\View La vue contenant la liste des articles.
+     * Display a listing of the resource.
      */
-    public function index(Request $request): \Illuminate\View\View
+    public function index(Request $request): JsonResponse
     {
-        $search = $request->input('search');
-
-        $articles = Article::when($search, fn($query, $term) => $query->searchByText($term))->latest()->get();
-
-        return view('articles.index', compact('articles'));
+        try {
+            $search = $request->input('search');
+            // Assuming 'searchByText' is a local scope on the Article model
+            $articles = Article::when($search, function($query, $term) {
+                                    return $query->where('name', 'like', "%{$term}%") // Example search logic
+                                                 ->orWhere('description', 'like', "%{$term}%");
+                                })
+                                ->latest()
+                                ->paginate(15);
+            return response()->json($articles);
+        } catch (\Exception $e) {
+            Log::error('Error fetching articles: ' . $e->getMessage());
+            return response()->json(['message' => 'Error fetching articles', 'error' => $e->getMessage()], 500);
+        }
     }
 
     /**
-     * Affiche le formulaire de création d'une nouvelle ressource.
-     *
-     * @return \Illuminate\View\View La vue du formulaire de création.
+     * Store a newly created resource in storage.
      */
-    public function create(): \Illuminate\View\View
+    public function store(StoreArticleRequest $request): JsonResponse
     {
-        $categories = Categorie::all();
-        $fournisseurs = Fournisseur::all();
-        $emplacements = Emplacement::all();
-        $users = User::all();
-        return view('articles.create', compact('categories', 'fournisseurs', 'emplacements', 'users'));
+        try {
+            $validatedData = $request->validated();
+            $userId = Auth::id();
+
+            // Note: 'created_by' => $userId might fail if $userId is null and DB column doesn't allow it.
+            // This will be properly handled when authentication is set up.
+            $article = Article::create($validatedData + ['created_by' => $userId]);
+
+            return response()->json($article, 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['message' => 'Validation failed', 'errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            Log::error('Error creating article: ' . $e->getMessage());
+            return response()->json(['message' => 'Error creating article: ' . $e->getMessage()], 500);
+        }
     }
 
     /**
-     * Enregistre une nouvelle ressource dans la base de données.
-     *
-     * @param  \App\Http\Requests\StoreArticleRequest  $request La requête de stockage validée.
-     * @return \Illuminate\Http\RedirectResponse Une redirection vers la liste des articles avec un message de succès.
+     * Display the specified resource.
      */
-    public function store(StoreArticleRequest $request): \Illuminate\Http\RedirectResponse
+    public function show(string $id): JsonResponse
     {
-        // Ajoute l'ID de l'utilisateur authentifié comme créateur de l'article.
-        $article = Article::create($request->validated() + ['created_by' => auth()->id()]);
-
-        return redirect()->route('articles.index')->with('success', 'Article créé avec succès.');
+        try {
+            $article = Article::findOrFail($id);
+            return response()->json($article);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => 'Article not found'], 404);
+        } catch (\Exception $e) {
+            Log::error("Error fetching article {$id}: " . $e->getMessage());
+            return response()->json(['message' => 'Error fetching article', 'error' => $e->getMessage()], 500);
+        }
     }
 
     /**
-     * Affiche la ressource spécifiée.
-     *
-     * @param  \App\Models\Article  $article L'instance de l'article à afficher.
-     * @return \Illuminate\View\View La vue affichant les détails de l'article.
+     * Update the specified resource in storage.
      */
-    public function show(Article $article): \Illuminate\View\View
+    public function update(UpdateArticleRequest $request, string $id): JsonResponse
     {
-        return view('articles.show', compact('article'));
+        try {
+            $article = Article::findOrFail($id);
+            // TODO: Add authorization check: e.g., if (Auth::id() !== $article->created_by && $article->created_by !== null) { abort(403, 'Unauthorized'); }
+            $article->update($request->validated());
+            return response()->json($article);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => 'Article not found'], 404);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['message' => 'Validation failed', 'errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            Log::error("Error updating article {$id}: " . $e->getMessage());
+            return response()->json(['message' => 'Error updating article', 'error' => $e->getMessage()], 500);
+        }
     }
 
     /**
-     * Affiche le formulaire de modification de la ressource spécifiée.
-     *
-     * @param  \App\Models\Article  $article L'instance de l'article à modifier.
-     * @return \Illuminate\View\View La vue du formulaire de modification.
+     * Remove the specified resource from storage.
      */
-    public function edit(Article $article): \Illuminate\View\View
+    public function destroy(string $id): JsonResponse
     {
-        $categories = Categorie::all();
-        $fournisseurs = Fournisseur::all();
-        $emplacements = Emplacement::all();
-        return view('articles.edit', compact('article', 'categories', 'fournisseurs', 'emplacements'));
-    }
-
-    /**
-     * Met à jour la ressource spécifiée dans la base de données.
-     *
-     * @param  \App\Http\Requests\UpdateArticleRequest  $request La requête de mise à jour validée.
-     * @param  \App\Models\Article  $article L'instance de l'article à mettre à jour.
-     * @return \Illuminate\Http\RedirectResponse Une redirection vers la liste des articles avec un message de succès.
-     */
-    public function update(UpdateArticleRequest $request, Article $article): \Illuminate\Http\RedirectResponse
-    {
-        $article->update($request->validated());
-
-        return redirect()->route('articles.index')->with('success', 'Article mis à jour avec succès.');
-    }
-
-    /**
-     * Supprime la ressource spécifiée de la base de données.
-     *
-     * @param  \App\Models\Article  $article L'instance de l'article à supprimer.
-     * @return \Illuminate\Http\RedirectResponse Une redirection vers la liste des articles avec un message de succès.
-     */
-    public function destroy(Article $article): \Illuminate\Http\RedirectResponse
-    {
-        $article->delete();
-
-        return redirect()->route('articles.index')->with('success', 'Article supprimé avec succès.');
+        try {
+            $article = Article::findOrFail($id);
+            // TODO: Add authorization check here
+            $article->delete();
+            return response()->json(null, 204);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => 'Article not found'], 404);
+        } catch (\Exception $e) {
+            Log::error("Error deleting article {$id}: " . $e->getMessage());
+            return response()->json(['message' => 'Error deleting article', 'error' => $e->getMessage()], 500);
+        }
     }
 }
