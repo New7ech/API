@@ -26,14 +26,16 @@ class ArticleFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => $this->faker->words(3, true),
-            'description' => $this->faker->sentence,
-            'prix' => $this->faker->randomFloat(2, 1, 1000),
-            'quantite' => $this->faker->numberBetween(1, 100),
-            'category_id' => Categorie::factory(),
-            'fournisseur_id' => Fournisseur::factory(),
-            'emplacement_id' => Emplacement::factory(),
+            'name' => $this->faker->sentence,
+            'description' => $this->faker->paragraph,
+            'prix' => $this->faker->randomFloat(2, 10, 500), // Changed from purchase/sale_price
+            'quantite' => $this->faker->numberBetween(1, 100), // Changed from quantity
+            // 'image' => null, // Removed, not in migration
+            // 'status' => $this->faker->randomElement(['disponible', 'en rupture', 'commande']), // Removed, not in migration
             'created_by' => User::factory(),
+            'category_id' => Categorie::factory(), // Changed from categorie_id
+            'emplacement_id' => Emplacement::factory(),
+            'fournisseur_id' => Fournisseur::factory(),
         ];
     }
 }

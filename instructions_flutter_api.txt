@@ -171,11 +171,13 @@ Toutes les requêtes suivantes doivent inclure l'en-tête `Authorization: Bearer
 - **Corps de la requête (JSON) :**
   ```json
   {
-      "name": "Nouvel Article",
-      "description": "Description du nouvel article",
-      "price": 19.99, // Exemple, si vous avez un champ prix
-      "quantity": 100 // Exemple, si vous avez un champ quantité
-      // Assurez-vous que les champs correspondent à votre modèle Article et StoreArticleRequest
+      "name": "Nouvel Article Scientifique",
+      "description": "Une description détaillée de ce nouvel article.",
+      "prix": 29.99,
+      "quantite": 75,
+      "category_id": 1,
+      "fournisseur_id": 1,
+      "emplacement_id": 1
   }
   ```
 - **Exemple cURL :**
@@ -184,8 +186,15 @@ Toutes les requêtes suivantes doivent inclure l'en-tête `Authorization: Bearer
        -H "Authorization: Bearer VOTRE_TOKEN" \
        -H "Content-Type: application/json" \
        -H "Accept: application/json" \
-       -d '{ "name": "Nouvel Article", "description": "Description...", "price": 20.5, "quantity": 50 }'
-       // Adaptez les champs à votre modèle Article et StoreArticleRequest
+       -d '{
+             "name": "Nouvel Article Scientifique",
+             "description": "Une description détaillée de ce nouvel article.",
+             "prix": 29.99,
+             "quantite": 75,
+             "category_id": 1, # Optionnel, si vous voulez l'associer directement
+             "fournisseur_id": 1, # Optionnel
+             "emplacement_id": 1  # Optionnel
+           }'
   ```
 - **Réponse (JSON, code 201) :**
   ```json
@@ -224,18 +233,34 @@ Toutes les requêtes suivantes doivent inclure l'en-tête `Authorization: Bearer
 - **Corps de la requête (JSON) :**
   ```json
   {
-      "name": "Article Modifié",
-      "description": "Description mise à jour."
-      // ... autres champs à modifier (selon UpdateArticleRequest)
+      "name": "Nom d'Article Mis à Jour",
+      "description": "Description actualisée et plus complète.",
+      "prix": 35.50,
+      "quantite": 60,
+      "category_id": 2,
+      "fournisseur_id": null,
+      "emplacement_id": 1
   }
   ```
+# Note : Une requête PUT implique généralement un remplacement complet de la ressource.
+# Si vous souhaitez ne mettre à jour que certains champs (mise à jour partielle),
+# la méthode PATCH serait plus sémantique, bien que Laravel gère souvent PUT pour les deux cas.
+# Les règles de validation avec 'sometimes' dans UpdateArticleRequest offrent cette flexibilité.
 - **Exemple cURL :**
   ```bash
   curl -X PUT http://127.0.0.1:8000/api/articles/1 \
        -H "Authorization: Bearer VOTRE_TOKEN" \
        -H "Content-Type: application/json" \
        -H "Accept: application/json" \
-       -d '{ "name": "Article Modifié", "description": "Description mise à jour." }'
+       -d '{
+             "name": "Nom d'Article Mis à Jour",
+             "description": "Description actualisée et plus complète.",
+             "prix": 35.50,
+             "quantite": 60,
+             "category_id": 2, # Exemple de changement de catégorie
+             "fournisseur_id": null, # Exemple pour désassocier un fournisseur
+             "emplacement_id": 1
+           }'
   ```
 - **Réponse (JSON) :**
   ```json
@@ -600,6 +625,8 @@ class _ArticleScreenState extends State<ArticleScreen> {
   void _showCreateArticleDialog() {
     final nameController = TextEditingController();
     final descriptionController = TextEditingController();
+    final prixController = TextEditingController(); // Add this
+    final quantiteController = TextEditingController(); // Add this
 
     showDialog(
       context: context,
@@ -611,27 +638,40 @@ class _ArticleScreenState extends State<ArticleScreen> {
             children: [
               TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Nom')),
               TextField(controller: descriptionController, decoration: const InputDecoration(labelText: 'Description')),
+              TextField(controller: prixController, decoration: const InputDecoration(labelText: 'Prix'), keyboardType: TextInputType.numberWithOptions(decimal: true)), // Add this
+              TextField(controller: quantiteController, decoration: const InputDecoration(labelText: 'Quantité'), keyboardType: TextInputType.number), // Add this
             ],
           ),
           actions: [
             TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Annuler')),
             ElevatedButton(
               onPressed: () async {
-                if (nameController.text.isNotEmpty && descriptionController.text.isNotEmpty) {
+                final name = nameController.text;
+                final description = descriptionController.text;
+                final prix = double.tryParse(prixController.text);
+                final quantite = int.tryParse(quantiteController.text);
+
+                if (name.isNotEmpty && description.isNotEmpty && prix != null && quantite != null) { // Check all fields
                   try {
                     await _apiService.createArticle({
-                      'name': nameController.text,
-                      'description': descriptionController.text,
-                      // Ajoutez d'autres champs si nécessaire pour votre API
+                      'name': name,
+                      'description': description,
+                      'prix': prix, // Add this
+                      'quantite': quantite, // Add this
+                      // Vous pouvez également ajouter des champs pour category_id, etc., si vous ajoutez des sélecteurs au dialogue
                     });
                     Navigator.of(context).pop();
                     _fetchArticles(); // Rafraîchir la liste
                   } catch (e) {
-                    // Gérer l'erreur (par exemple, afficher un SnackBar)
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('Erreur création: ${e.toString()}'))
                     );
                   }
+                } else {
+                  // Optionnel: Afficher un message si les champs ne sont pas valides
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Veuillez remplir tous les champs correctement.'))
+                  );
                 }
               },
               child: const Text('Créer'),

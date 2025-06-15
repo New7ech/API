@@ -23,9 +23,13 @@ class FournisseurFactory extends Factory
     {
         return [
             'name' => $this->faker->company,
+            'nom_entreprise' => $this->faker->company,
             'telephone' => $this->faker->phoneNumber,
             'email' => $this->faker->unique()->safeEmail,
             'adresse' => $this->faker->address,
+            'ville' => $this->faker->city,
+            'pays' => $this->faker->country, // Added pays
+            'description' => $this->faker->sentence,
         ];
     }
 }
