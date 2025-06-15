@@ -47,7 +47,7 @@ class EmplacementController extends Controller
      */
     public function show(Emplacement $emplacement)
     {
-        //
+        return view('emplacements.show', compact('emplacement'));
     }
 
     /**
@@ -55,7 +55,7 @@ class EmplacementController extends Controller
      */
     public function edit(Emplacement $emplacement)
     {
-        //
+        return view('emplacements.edit', compact('emplacement'));
     }
 
     /**
@@ -63,7 +63,15 @@ class EmplacementController extends Controller
      */
     public function update(UpdateEmplacementRequest $request, Emplacement $emplacement)
     {
-        //
+        $request->validate(['name' => 'required|unique:categories,name,' . $emplacement->id,
+            'description' => 'nullable|string|max:255',
+        ]);
+
+        $emplacement->update(['name' => $request->name,
+            'description' => $request->description]);
+
+        return redirect()->route('emplacements.index')
+            ->with('success', 'categorie updated successfully.');
     }
 
     /**
@@ -71,6 +79,9 @@ class EmplacementController extends Controller
      */
     public function destroy(Emplacement $emplacement)
     {
-        //
+        $emplacement->delete();
+
+        return redirect()->route('emplacements.index')
+            ->with('success', 'categorie deleted successfully.');
     }
 }

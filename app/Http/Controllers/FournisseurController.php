@@ -60,7 +60,9 @@ class FournisseurController extends Controller
      */
     public function show(Fournisseur $fournisseur)
     {
-        //
+        return view('fournisseurs.show', [
+            'fournisseur' => $fournisseur,
+        ]);
     }
 
     /**
@@ -68,7 +70,9 @@ class FournisseurController extends Controller
      */
     public function edit(Fournisseur $fournisseur)
     {
-        //
+        return view('fournisseurs.edit', [
+            'fournisseur' => $fournisseur,
+        ]);
     }
 
     /**
@@ -76,7 +80,28 @@ class FournisseurController extends Controller
      */
     public function update(UpdateFournisseurRequest $request, Fournisseur $fournisseur)
     {
-        //
+        $request->validate(['name' => 'required|unique:categories,name,' . $fournisseur->id,
+            'description' => 'nullable|string|max:255', // Validation pour la description
+            'nom_entreprise' => 'required|string|max:255',
+            'adresse' => 'required|string|max:255',
+            'telephone' => 'required|string|max:20',
+            'email' => 'required|email|unique:fournisseurs,email,' . $fournisseur->id,
+            'ville' => 'required|string|max:255',
+            'pays' => 'required|string|max:255',
+        ]);
+
+        $fournisseur->update(['name' => $request->name,
+            'description' => $request->description,
+            'nom_entreprise' => $request->nom_entreprise,
+            'adresse' => $request->adresse,
+            'telephone' => $request->telephone,
+            'email' => $request->email,
+            'ville' => $request->ville,
+            'pays' => $request->pays,
+        ]);
+
+        return redirect()->route('fournisseurs.index')
+            ->with('success', 'categorie updated successfully.');
     }
 
     /**
@@ -84,6 +109,9 @@ class FournisseurController extends Controller
      */
     public function destroy(Fournisseur $fournisseur)
     {
-        //
+        $fournisseur->delete();
+
+        return redirect()->route('fournisseurs.index')
+            ->with('success', 'categorie deleted successfully.');
     }
 }

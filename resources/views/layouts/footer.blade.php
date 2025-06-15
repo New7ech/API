@@ -15,7 +15,7 @@
             </ul>
         </nav>
         <div class="copyright ms-auto">
-            &copy; {{ date('Y') }}, fait avec <i class="fa fa-heart heart text-danger"></i> par <a href="https://www.themekita.com" target="_blank">ThemeKita</a> &amp; adapté par VotreNom/Entreprise
+            &copy; {{ date('Y') }}, fait avec <i class="fa fa-heart heart text-danger"></i> par <a href="https://www.sinaremohamed.com" target="_blank">SINARE Mohamed</a> &amp; adapté par New7ech Entreprise
         </div>
     </div>
 </footer>

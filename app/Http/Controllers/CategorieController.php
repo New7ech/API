@@ -47,7 +47,7 @@ class CategorieController extends Controller
      */
     public function show(Categorie $categorie)
     {
-        //
+        return view('categories.show', compact('categorie'));
     }
 
     /**
@@ -55,7 +55,7 @@ class CategorieController extends Controller
      */
     public function edit(Categorie $categorie)
     {
-        //
+        return view('categories.edit', compact('categorie'));
     }
 
     /**
@@ -63,7 +63,15 @@ class CategorieController extends Controller
      */
     public function update(UpdateCategorieRequest $request, Categorie $categorie)
     {
-        //
+        $request->validate(['name' => 'required|unique:categories,name,' . $categorie->id,
+            'description' => 'nullable|string|max:255', // Validation pour la description
+        ]);
+
+        $categorie->update(['name' => $request->name,
+            'description' => $request->description]);
+
+        return redirect()->route('categories.index')
+            ->with('success', 'Categorie updated successfully.');
     }
 
     /**
@@ -71,6 +79,9 @@ class CategorieController extends Controller
      */
     public function destroy(Categorie $categorie)
     {
-        //
+        $categorie->delete();
+
+        return redirect()->route('categories.index')
+            ->with('success', 'Categorie deleted successfully.');
     }
 }
